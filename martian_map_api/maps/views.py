@@ -31,7 +31,6 @@ def Path(request: HttpRequest):
     tifFiles = {
        'elevation' : map.Elename,
        'thermal' : map.Thermname,
-       'rad' : map.Radname,
        'fe' : map.Fename,
        'si' : map.Siname,
        'wind' : map.Windname,
@@ -41,11 +40,13 @@ def Path(request: HttpRequest):
         'maxTherm' : request.GET.get('maxTherm'),
         'minTherm' : request.GET.get('minTherm'),
         'maxSlope' : request.GET.get('maxSlope'),
-        'maxRadiation' : request.GET.get('maxRadiation'),
         'maxWind' : request.GET.get('maxWind'),
         'speed' : request.GET.get('speed'),
+        'step': request.GET.get('step'),
         'mode' : mode
     }
+
+    resource_weights = None
     if mode == 'science':
         def parse_float(val, default_val):
             try:
@@ -63,11 +64,26 @@ def Path(request: HttpRequest):
             'si': si
         }
 
-        allPath = services.getLeastCostRoute(coordinates, tifFiles, safelimites, resource_weights)
-    else:
-        allPath = services.getLeastCostRoute(coordinates, tifFiles, safelimites)
+    try:
+        allPath = services.getLeastCostRoute(
+            coordinates, 
+            tifFiles, 
+            safelimites, 
+            resource_weights
+        )
+    except ValueError as err:
+        return JsonResponse({"error": str(err)}, status=400)
+    except Exception as exc:
+        return JsonResponse({"error": f"Path calculation failed: {str(exc)}"}, status=500)
     
     return JsonResponse(allPath,safe=False)
+
 def vehicles(request: HttpRequest):
     vehiclesInfo = list(Vehicle.objects.all().values())
     return JsonResponse(vehiclesInfo,safe=False)
+
+def custom_404(request, exception=None):
+    return JsonResponse({
+        "error": "Not Found",
+        "message": "The requested resource/endpoint was not found."
+    }, status=404)

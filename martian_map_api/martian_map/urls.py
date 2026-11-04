@@ -17,6 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import include, path
 
+handler404 = 'maps.views.custom_404'
 urlpatterns = [
     path('',include('maps.urls')),
     path('admin/', admin.site.urls),

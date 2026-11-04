@@ -1,4 +1,3 @@
-import time
 import numpy as np
 import pandas as pd
 import rasterio
@@ -7,6 +6,8 @@ from rasterio.transform import xy
 from scipy.ndimage import gaussian_filter
 from skimage.graph import route_through_array
 from django.conf import settings
+
+# from maps.test import plotRoute
 
 def normalize_map(arr, valid_mask=None):
     if valid_mask is None:
@@ -51,7 +52,6 @@ def getLeastCostRoute(coordinates, tifFiles, safelimites, resource_weights=None)
     tifMap_path = getTifFile(tifFiles['elevation'])
     tifTherm_path = getTifFile(tifFiles['thermal'])
     tifH2O_path = getTifFile(tifFiles['H2O'])
-    tifRad_path = getTifFile(tifFiles['rad'])
     tifWind_path = getTifFile(tifFiles['wind'])
     tifSi_path = getTifFile(tifFiles['si'])
     tifFe_path = getTifFile(tifFiles['fe'])
@@ -62,9 +62,6 @@ def getLeastCostRoute(coordinates, tifFiles, safelimites, resource_weights=None)
 
     with rasterio.open(tifTherm_path) as src:
         therm = src.read(1).astype(np.float64)
-
-    with rasterio.open(tifRad_path) as src:
-        rad = src.read(1).astype(np.float64)
 
     with rasterio.open(tifH2O_path) as src:
         H2O = src.read(1).astype(np.float64)
@@ -100,10 +97,8 @@ def getLeastCostRoute(coordinates, tifFiles, safelimites, resource_weights=None)
         else:
             combined_resource_score = 0.0
 
-        RESOURCE_WEIGHT = 150.0
+        RESOURCE_WEIGHT = 100.0
         resource_cost = RESOURCE_WEIGHT * ((1.0 - combined_resource_score) ** 2)
-
-    start_time = time.time()
 
     start_node = (start_row, start_col)
     end_node = (end_row, end_col)
@@ -176,9 +171,6 @@ def getLeastCostRoute(coordinates, tifFiles, safelimites, resource_weights=None)
     MAX_SAFE_WIND = float(safelimites['maxWind'])
     WIND_PENALTY_WEIGHT = 50.0
 
-    MAX_SAFE_RAD = float(safelimites['maxRadiation'])
-    RAD_PENALTY_WEIGHT = 50.0
-
     MAX_SAFE_THERM = float(safelimites['maxTherm'])
     MIN_SAFE_THERM = float(safelimites['minTherm'])
     THERM_PENALTY_WEIGHT = 50.0
@@ -190,20 +182,17 @@ def getLeastCostRoute(coordinates, tifFiles, safelimites, resource_weights=None)
         thermRange = 1.0
 
     therm_cost = THERM_PENALTY_WEIGHT * ((1.0 - (np.clip((therm - MIN_SAFE_THERM) / thermRange, 0.0, 1.0))) ** 2)
-    rad_cost = RAD_PENALTY_WEIGHT * ((np.clip(rad / MAX_SAFE_RAD, 0.0, 1.0)) ** 2)
     wind_cost = WIND_PENALTY_WEIGHT * ((np.clip(wind / MAX_SAFE_WIND, 0.0, 1.0)) ** 2)
     terrain_cost = SLOPE_PENALTY_WEIGHT * ((np.clip(slope_degrees / MAX_SAFE_SLOPE, 0.0, 1.0)) ** 2)
 
-    total_cost = 1.0 + terrain_cost + therm_cost + rad_cost + wind_cost + resource_cost
+    total_cost = 1.0 + terrain_cost + therm_cost + wind_cost + resource_cost
 
     traversable = (
         valid_data
         & np.isfinite(slope_degrees)
         & np.isfinite(therm)
-        & np.isfinite(rad)
         & np.isfinite(wind)
         & (slope_degrees <= MAX_SAFE_SLOPE)
-        & (rad <= MAX_SAFE_RAD)
         & (wind <= MAX_SAFE_WIND)
         & safeThermalMask
     )
@@ -240,7 +229,6 @@ def getLeastCostRoute(coordinates, tifFiles, safelimites, resource_weights=None)
     pathH2O = H2O[path_rows, path_cols]
     pathSlopes = slope_degrees[path_rows, path_cols]
     pathElevations = elevation[path_rows, path_cols]
-    pathRad = rad[path_rows, path_cols]
     pathWind = wind[path_rows, path_cols]
     pathFe = fe[path_rows, path_cols]
     pathSi = si[path_rows, path_cols]
@@ -257,7 +245,6 @@ def getLeastCostRoute(coordinates, tifFiles, safelimites, resource_weights=None)
         route_length_m = float(np.sum(np.hypot(dx_path_m, dy_path_m)))
 
     route_length_km = route_length_m / 1000.0
-    execution_time = time.time() - start_time
 
     x_coords, y_coords = xy(transform, path_rows, path_cols)
 
@@ -271,23 +258,33 @@ def getLeastCostRoute(coordinates, tifFiles, safelimites, resource_weights=None)
         "H2O": pathH2O,
         "Fe": pathFe,
         "Si": pathSi,
-        "radiation": pathRad
     })
+    step_interval = 1
+    if (safelimites['step']): step_interval=int(safelimites['step'])
 
+    simplified_df = route_df.iloc[::step_interval].copy()
+
+    if route_df.index[-1] not in simplified_df.index:
+        simplified_df = pd.concat([simplified_df, route_df.tail(1)])
+
+    simplified_df["Step"] = range(1, len(simplified_df) + 1)
     rover_speed = float(safelimites.get('speed', 1.0))
     estimated_time_hours = route_length_km / rover_speed if rover_speed > 0 else 0.0
+    plotRoute.plot_route_on_elevation(elevation,transform,path_rows,path_cols)
     return {
-        "path_data": route_df.to_dict(orient="records"),
+        "path_data": simplified_df.to_dict(orient="records"),
         "route_length_km": round(route_length_km, 2),
         "route_length_m": round(route_length_m, 2),
         "estimated_time_hours": round(estimated_time_hours, 2),
+        "mean_Fe": round(float(pathFe.mean()), 2),
+        "mean_Si": round(float(pathSi.mean()), 2),
+        "mean_H2O": round(float(pathH2O.mean()), 2),
         "maximum_slope": round(float(pathSlopes.max()), 2),
         "minimum_slope": round(float(pathSlopes.min()), 2),
         "maximum_therm": round(float(pathTempretures.max()), 2),
         "minimum_therm": round(float(pathTempretures.min()), 2),
         "maximum_wind_speed": round(float(pathWind.max()), 2),
         "accumulated_cost": round(float(accumulated_cost), 3),
-        "max_safe_slope": MAX_SAFE_SLOPE,
     }
 
 def getImageBounds(tif):
