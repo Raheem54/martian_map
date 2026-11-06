@@ -1,27 +1,98 @@
 @import "tailwindcss";
-@import 'maplibre-gl/dist/maplibre-gl.css';
+@import "maplibre-gl/dist/maplibre-gl.css";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
+
+  --background: #121214;
+  --background-elevated: #19191d;
+  --surface: rgb(24 24 28 / 82%);
+  --surface-strong: rgb(18 18 20 / 94%);
+  --foreground: #f4f4f5;
+  --foreground-muted: #9ca3af;
+  --foreground-subtle: #71717a;
+  --border-subtle: rgb(255 255 255 / 10%);
+  --accent: #e05638;
+  --accent-bright: #f26b4d;
+  --accent-soft: rgb(224 86 56 / 16%);
+  --telemetry: #67d8f2;
+  --telemetry-soft: rgb(103 216 242 / 14%);
+
+  --glass-shadow: 0 18px 50px rgb(0 0 0 / 35%);
+  --glass-highlight: inset 0 1px 0 rgb(255 255 255 / 5%);
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-background-elevated: var(--background-elevated);
+  --color-surface: var(--surface);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-muted: var(--foreground-muted);
+  --color-subtle: var(--foreground-subtle);
+  --color-line: var(--border-subtle);
+  --color-mars: var(--accent);
+  --color-mars-bright: var(--accent-bright);
+  --color-mars-soft: var(--accent-soft);
+  --color-telemetry: var(--telemetry);
+  --color-telemetry-soft: var(--telemetry-soft);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --text-telemetry: 0.75rem;
+  --text-telemetry--line-height: 1rem;
+  --text-label: 0.6875rem;
+  --text-label--line-height: 1rem;
+
+  --spacing-panel: 1.25rem;
+  --spacing-overlay: 1rem;
+  --radius-card: 1rem;
+  --radius-panel: 1.25rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: var(--border-subtle);
+}
+
+html,
+body {
+  min-height: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--foreground);
+}
+
+@utility glass-panel {
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--glass-shadow), var(--glass-highlight);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+@utility glass-card {
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  box-shadow: var(--glass-shadow), var(--glass-highlight);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+@utility telemetry-text {
+  color: var(--telemetry);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: var(--text-telemetry);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  line-height: var(--text-telemetry--line-height);
 }
