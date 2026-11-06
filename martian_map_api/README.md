@@ -3,6 +3,8 @@
 Django-based HTTP API that serves Martian map imagery, destination points, rover
 data, and computes safe route plans over Martian terrain rasters.
 
+- API public host: <a href="https://raheemelnashar.pythonanywhere.com/">Here</a>
+
 - Framework: **Django 6** (plain Django views returning `JsonResponse`)
 - Entry point: `manage.py` (dev: `python manage.py runserver`)
 - URL config: `martian_map/urls.py` (mounts `maps.urls` at the site root)
@@ -28,7 +30,6 @@ The entire API uses the following fixed units.
 | Silicon abundance (`Si`) | **percent** | % |
 | Water abundance (`H2O`) | **percent** | % |
 | Iron abundance (`Fe`) | **percent** | % |
-| Radiation (`radiation`, `maxRadiation`) | **counts per second** | cps |
 
 Notes:
 - Coordinates (`X_coordinate`, `Y_coordinate`, `x_coord`, `y_coord`, and the
@@ -127,9 +128,9 @@ Common parameters:
 | `maxSlope` | number | degrees | yes | Maximum traversable slope |
 | `maxTherm` | number | K | yes | Maximum safe temperature |
 | `minTherm` | number | K | yes | Minimum safe temperature |
-| `maxRadiation` | number | cps | yes | Maximum safe radiation |
 | `maxWind` | number | m/s | yes | Maximum safe wind speed |
 | `speed` | number | km/h | yes | Rover speed, used for `estimated_time` |
+| `step` | number | - | no | Steps between the points of the route (default `1`) |
 
 Science-mode-only parameters:
 
@@ -166,18 +167,21 @@ GET /path/?map=1&mode=science&startX=1000&startY=2000&endX=5000&endY=6000&maxSlo
       "H2O": 12.3,
       "Fe": 8.7,
       "Si": 21.0,
-      "radiation": 0.31
+      "Distance_km": 14.819
     }
   ],
-  "route_length": 12.34,
-  "estimated_time": 1.23,
+  "route_length_km": 12.34,
+  "route_length_m": 12.34,
+  "estimated_time_hours": 1.23,
   "maximum_slope": 14.2,
   "minimum_slope": 0.4,
   "maximum_therm": 288.1,
   "minimum_therm": 210.9,
   "maximum_wind_speed": 18.4,
   "accumulated_cost": 4521.337,
-  "max_safe_slope": 15.0
+  "mean_Fe": 4.7,
+  "mean_Si": 2.4,
+  "mean_H2O": 5.8,
 }
 ```
 
@@ -193,16 +197,19 @@ GET /path/?map=1&mode=science&startX=1000&startY=2000&endX=5000&endY=6000&maxSlo
 | `path_data[].H2O` | number | **%** | Water abundance at the cell |
 | `path_data[].Fe` | number | **%** | Iron abundance at the cell |
 | `path_data[].Si` | number | **%** | Silicon abundance at the cell |
-| `path_data[].radiation` | number | **cps** | Radiation at the cell |
-| `route_length` | number | **km** | Total route length (2 decimals) |
-| `estimated_time` | number | **hours** | `route_length / speed` (2 decimals) |
+| `path_data[].Distance_km` | number | **km** | Distance between this cell and start point |
+| `route_length_km` | number | **km** | Total route length (2 decimals) |
+| `route_length_m` | number | **m** | Total route length (2 decimals) |
+| `estimated_time_hours` | number | **hours** | `route_length / speed` (2 decimals) |
 | `maximum_slope` | number | degrees | Max slope along the route (2 decimals) |
+| `mean_Si` | number | **%** | Si avg in th route |
+| `mean_Fe` | number | **%** | Fe avg in th route |
+| `mean_H2O` | number | **%** | Water avg in th route |
 | `minimum_slope` | number | degrees | Min slope along the route (2 decimals) |
 | `maximum_therm` | number | **K** | Max temperature along the route |
 | `minimum_therm` | number | **K** | Min temperature along the route |
 | `maximum_wind_speed` | number | **m/s** | Max wind along the route |
 | `accumulated_cost` | number | – | Dimensionless path cost (3 decimals) |
-| `max_safe_slope` | number | degrees | Echo of the `maxSlope` input |
 
 Note: wind is reported only as a route maximum (`maximum_wind_speed`), not per
 waypoint.
@@ -221,7 +228,7 @@ total = 1
          100 * (1 - (h2o_w * H2O_norm + fe_w * Fe_norm + si_w * Si_norm))^2
 ```
 
-Cells that violate any hard limit (slope, temperature, radiation, wind, or
+Cells that violate any hard limit (slope, temperature, wind, or
 missing data) are blocked. The path is the minimum-cost route
 (`skimage.graph.route_through_array`, fully connected).
 
@@ -294,5 +301,5 @@ as-is. Values returned here are intended to be passed straight back to
 Basemaps and rasters are served from `/static/`. Each map region provides a PNG
 basemap plus seven GeoTIFF layers used by the routing engine:
 
-`Ele` (elevation), `Therm` (thermal, K), `Rad` (radiation, cps),
+`Ele` (elevation), `Therm` (thermal, K),
 `Fe` (iron, %), `H2O` (water, %), `Si` (silicon, %), `Wind` (wind, m/s).

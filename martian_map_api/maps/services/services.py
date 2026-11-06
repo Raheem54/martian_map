@@ -234,6 +234,7 @@ def getLeastCostRoute(coordinates, tifFiles, safelimites, resource_weights=None)
     pathSi = si[path_rows, path_cols]
 
     if len(path_rows) < 2:
+        cumulative_distance_m = np.array([0.0])
         route_length_m = 0.0
     else:
         row_diff = np.diff(path_rows)
@@ -242,9 +243,13 @@ def getLeastCostRoute(coordinates, tifFiles, safelimites, resource_weights=None)
         dx_path_m = col_diff * dx_m
         dy_path_m = row_diff * dy_m
 
-        route_length_m = float(np.sum(np.hypot(dx_path_m, dy_path_m)))
+        step_distances_m = np.hypot(dx_path_m, dy_path_m)
+
+        cumulative_distance_m = np.insert(np.cumsum(step_distances_m), 0, 0.0)
+        route_length_m = float(cumulative_distance_m[-1])
 
     route_length_km = route_length_m / 1000.0
+    cumulative_distance_km = cumulative_distance_m / 1000.0
 
     x_coords, y_coords = xy(transform, path_rows, path_cols)
 
@@ -258,6 +263,7 @@ def getLeastCostRoute(coordinates, tifFiles, safelimites, resource_weights=None)
         "H2O": pathH2O,
         "Fe": pathFe,
         "Si": pathSi,
+        "Distance_km": np.round(cumulative_distance_km, 3)
     })
     step_interval = 1
     if (safelimites['step']): step_interval=int(safelimites['step'])
@@ -270,7 +276,7 @@ def getLeastCostRoute(coordinates, tifFiles, safelimites, resource_weights=None)
     simplified_df["Step"] = range(1, len(simplified_df) + 1)
     rover_speed = float(safelimites.get('speed', 1.0))
     estimated_time_hours = route_length_km / rover_speed if rover_speed > 0 else 0.0
-    plotRoute.plot_route_on_elevation(elevation,transform,path_rows,path_cols)
+    # plotRoute.plot_route_on_elevation(elevation,transform,path_rows,path_cols)
     return {
         "path_data": simplified_df.to_dict(orient="records"),
         "route_length_km": round(route_length_km, 2),
